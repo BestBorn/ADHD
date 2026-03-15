@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+  background-color: #f3f4f6;
+}
+
+.tab-active {
+  @apply border-b-2 border-blue-500 text-blue-600;
+}
+
+.btn-primary {
+  @apply bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors;
+}
+
+.btn-accent {
+  @apply bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors;
+}
+
+.card {
+  @apply bg-white rounded-lg shadow-md p-6;
+}
+
+/* Smooth transitions for tab switching */
+.tab-content {
+  @apply transition-opacity duration-200;
+}
+
+.focus-mode.dimmed {
+  @apply opacity-30 pointer-events-none;
+}
