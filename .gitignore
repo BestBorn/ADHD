@@ -33,3 +33,7 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+
+# Extension builds
+*.zip
+!releases/README.md
