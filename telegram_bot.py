@@ -1,137 +1,117 @@
 #!/usr/bin/env python3
 """
-Telegram Bot integrated with Claude AI
+Telegram Bot integrated with Claude AI - Simple version
 """
 
 import os
 import logging
 from dotenv import load_dotenv
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import telebot
 from anthropic import Anthropic
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Anthropic client
+# Initialize clients
 client = Anthropic()
-
-# Store conversation history per user
-conversations = {}
-
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CLAUDE_API_KEY = os.getenv('CLAUDE_API_KEY')
 
 if not TELEGRAM_BOT_TOKEN or not CLAUDE_API_KEY:
-    raise ValueError("Missing TELEGRAM_BOT_TOKEN or CLAUDE_API_KEY in environment variables")
+    raise ValueError("Missing TELEGRAM_BOT_TOKEN or CLAUDE_API_KEY in .env")
+
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+
+# Store conversation history per user
+conversations = {}
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when /start is issued."""
-    user_id = update.effective_user.id
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    """Handle /start command"""
+    user_id = message.from_user.id
     conversations[user_id] = []
 
-    welcome_message = (
-        "👋 Hello! I'm a Telegram bot powered by Claude AI.\n\n"
-        "Just send me any message and I'll respond with the power of AI!\n\n"
+    welcome = (
+        "👋 Hi! I'm a Telegram bot powered by Claude AI.\n\n"
         "Commands:\n"
-        "/start - Show this welcome message\n"
-        "/clear - Clear conversation history\n"
-        "/help - Show help message"
+        "/start - Welcome\n"
+        "/clear - Clear history\n"
+        "/help - Help\n\n"
+        "Just send me any message!"
     )
-    await update.message.reply_text(welcome_message)
+    bot.reply_to(message, welcome)
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when /help is issued."""
+@bot.message_handler(commands=['help'])
+def send_help(message):
+    """Handle /help command"""
     help_text = (
-        "I'm Claude, an AI assistant integrated with Telegram.\n\n"
-        "How to use:\n"
-        "1. Send me any question or message\n"
-        "2. I'll respond using Claude AI\n"
-        "3. Use /clear to reset conversation history\n\n"
+        "I'm Claude, your AI assistant!\n\n"
         "Commands:\n"
         "/start - Welcome message\n"
         "/help - This message\n"
-        "/clear - Clear chat history"
+        "/clear - Clear conversation"
     )
-    await update.message.reply_text(help_text)
+    bot.reply_to(message, help_text)
 
 
-async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Clear conversation history for the user."""
-    user_id = update.effective_user.id
+@bot.message_handler(commands=['clear'])
+def clear_history(message):
+    """Handle /clear command"""
+    user_id = message.from_user.id
     conversations[user_id] = []
-    await update.message.reply_text("✅ Conversation history cleared!")
+    bot.reply_to(message, "✅ History cleared!")
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle incoming messages and respond with Claude."""
-    user_id = update.effective_user.id
-    user_message = update.message.text
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    """Handle all other messages"""
+    user_id = message.from_user.id
+    user_message = message.text
 
-    # Initialize conversation history if not exists
+    # Initialize if needed
     if user_id not in conversations:
         conversations[user_id] = []
 
-    # Add user message to history
+    # Add to history
     conversations[user_id].append({
         "role": "user",
         "content": user_message
     })
 
-    # Show typing indicator
-    await update.message.chat.send_action("typing")
-
     try:
-        # Get response from Claude
+        # Get Claude response
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=1024,
-            system="You are a helpful Telegram bot. Keep responses concise and friendly. If the message is very long, summarize it.",
+            system="You are a helpful Telegram bot. Keep responses concise and friendly.",
             messages=conversations[user_id]
         )
 
         assistant_message = response.content[0].text
 
-        # Add assistant response to history
+        # Add to history
         conversations[user_id].append({
             "role": "assistant",
             "content": assistant_message
         })
 
-        # Send response to user
-        await update.message.reply_text(assistant_message)
+        # Send response
+        bot.reply_to(message, assistant_message)
 
     except Exception as e:
-        logger.error(f"Error getting response from Claude: {e}")
-        await update.message.reply_text(
-            "❌ Sorry, I encountered an error processing your request. Please try again."
-        )
-
-
-def main() -> None:
-    """Start the bot."""
-    # Create the Application
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-    # Register handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("clear", clear_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Run the bot
-    logger.info("Bot started. Press Ctrl+C to stop.")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+        logger.error(f"Error: {e}")
+        bot.reply_to(message, "❌ Error processing request. Try again!")
 
 
 if __name__ == '__main__':
-    main()
+    logger.info("🚀 Bot started! Press Ctrl+C to stop.")
+    try:
+        bot.infinity_polling()
+    except KeyboardInterrupt:
+        logger.info("Bot stopped.")
